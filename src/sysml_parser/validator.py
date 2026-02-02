@@ -22,7 +22,7 @@ class Severity(Enum):
 
 
 @dataclass
-class SyntaxError:
+class SysMLSyntaxError:
     """A syntax error or warning found during validation."""
 
     line: int
@@ -33,6 +33,10 @@ class SyntaxError:
     def __str__(self) -> str:
         sev = self.severity.name.lower()
         return f"{sev} at {self.line}:{self.column}: {self.message}"
+
+
+# Alias for backwards compatibility
+SyntaxError = SysMLSyntaxError
 
 
 @dataclass

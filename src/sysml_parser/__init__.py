@@ -30,7 +30,10 @@ from .ast_nodes import (
     CommentNode,
 )
 from .extractor import SysMLExtractor, ExtractedModel, extract
-from .validator import SysMLValidator, ValidationResult, SyntaxError, validate, is_valid
+from .validator import SysMLValidator, ValidationResult, SysMLSyntaxError, validate, is_valid
+
+# Backwards compatibility alias
+SyntaxError = SysMLSyntaxError
 
 __all__ = [
     # Lexer
@@ -67,7 +70,8 @@ __all__ = [
     # Validator
     "SysMLValidator",
     "ValidationResult",
-    "SyntaxError",
+    "SysMLSyntaxError",
+    "SyntaxError",  # Backwards compatibility alias
     "validate",
     "is_valid",
 ]

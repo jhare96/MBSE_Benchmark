@@ -9,7 +9,7 @@ https://github.com/Systems-Modeling/SysML-v2-Release
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
+from typing import Any, Optional
 
 
 class Direction(Enum):
@@ -47,7 +47,7 @@ class ASTNode:
 
     location: Optional[SourceLocation] = None
 
-    def accept(self, visitor: "ASTVisitor") -> any:
+    def accept(self, visitor: "ASTVisitor") -> Any:
         """Accept a visitor for traversal."""
         method_name = f"visit_{type(self).__name__}"
         method = getattr(visitor, method_name, visitor.visit_default)
@@ -456,7 +456,7 @@ class ModelNode(ASTNode):
 class ASTVisitor:
     """Base class for AST visitors."""
 
-    def visit_default(self, node: ASTNode) -> any:
+    def visit_default(self, node: ASTNode) -> Any:
         """Default visit method for unhandled node types."""
         return None
 
