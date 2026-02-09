@@ -2,11 +2,11 @@ import json
 import os
 from openai import AsyncOpenAI
 
-from filesystem import FileSystem, load_virtual_filesystem
-from tools import get_virtual_filesystem_tools, toolcall
-from tasks import load_all_tasks, load_tasks_sample
-from models import Task
-from evaluation import EvaluationContext, EvaluationResult, evaluate_task
+from mbse_bench.filesystem import FileSystem, load_virtual_filesystem
+from mbse_bench.tools import get_virtual_filesystem_tools, toolcall
+from mbse_bench.tasks import load_all_tasks, load_tasks_sample
+from mbse_bench.models import Task
+from mbse_bench.evaluation import EvaluationContext, EvaluationResult, evaluate_task
 
 NO_TOOLS_PROMPT = """{task_prompt}
 

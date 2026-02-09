@@ -3,7 +3,7 @@
 import json
 import pathlib
 
-from models import Task, EvaluationTask, LlmJudgeConfig
+from mbse_bench.models import Task, LlmJudgeConfig
 
 
 def load_task(task_dir: str, llm_judge_config: LlmJudgeConfig | None = None) -> Task:

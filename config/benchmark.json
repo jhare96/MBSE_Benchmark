@@ -1,7 +1,9 @@
 {
   "llmJudge": {
     "modelId": "gpt-4.1",
-    "maxTokens": 1000
+    "maxTokens": 1000,
+    "temperature": 0.0,
+    "maxAttempts": 3
   },
   "maxIterations": 10,
   "timeout": 120000,

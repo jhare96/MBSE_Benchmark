@@ -12,16 +12,6 @@ class LlmJudgeConfig:
     temperature: float = 0.0
     max_attempts: int = 3
 
-
-@dataclass
-class EvaluationTask:
-    """Configuration for a task's evaluation."""
-    type: str
-    criteria: list[str]
-    rubric: dict[str, str]
-    weight: float
-
-
 @dataclass
 class Task:
     """A benchmark task definition."""
@@ -32,6 +22,5 @@ class Task:
     prompt: str
     max_tokens: int
     task_dir: str
-    evaluation: EvaluationTask
     metadata: dict
     llm_judge_config: Optional[LlmJudgeConfig] = None

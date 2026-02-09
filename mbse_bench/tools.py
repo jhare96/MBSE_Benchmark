@@ -1,4 +1,4 @@
-from filesystem import FileSystem
+from mbse_bench.filesystem import FileSystem
 
 
 def get_virtual_filesystem_tools() -> list[dict[str, str]]:
