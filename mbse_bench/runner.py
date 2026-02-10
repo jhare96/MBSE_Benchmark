@@ -56,18 +56,20 @@ def extract_and_apply_patch(final_response: str, fs: FileSystem) -> None:
         print(f"Patch Result: {result}")
 
 
-async def get_response(client, model_name, input, tools, responses_api):
+async def get_response(client, model_name, input, tools, responses_api, temperature: float):
     if responses_api:
         return await client.responses.create(
             model=model_name,
             input=input,
             tools=tools,
+            temperature=temperature,
         )
     else:
         return await client.chat.completions.create(   
             model=model_name,
             messages=input,
             tools=tools,
+            temperature=temperature,
         )
 
 
@@ -81,14 +83,14 @@ def format_response(input: list) -> str:
         # don't include tool calls as we only want to judge the final output.
     return formatted_output
 
-async def runtask(task: Task, client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool) -> EvaluationResult:
+async def runtask(task: Task, client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool, temperature: float) -> EvaluationResult:
     """agentic loop to run a task until completion"""
     fs = load_virtual_filesystem(task.task_dir)
     tools = get_virtual_filesystem_tools(responses_api)
     system_prompt = build_task_prompt(task, fs, supports_tools)
     input = [{"type": "message", "role": "system", "content": system_prompt}]
     for iteration in range(max_iterations):
-        response = await get_response(client, model_name, input, tools if supports_tools else [], responses_api)
+        response = await get_response(client, model_name, input, tools if supports_tools else [], responses_api, temperature)
         if responses_api:
             input += response.output
             tool_calls = [item for item in response.output if item.type == "function_call"]
@@ -148,12 +150,12 @@ async def run_tasks_in_parallel(tasks: list[Task], client: AsyncOpenAI, model_na
 
 
 
-async def benchmark(client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool) -> dict[str, list[EvaluationResult]]:
+async def benchmark(client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool, temperature: float) -> dict[str, list[EvaluationResult]]:
     """runs the full benchmark on a set of tasks and returns their outputs"""
     tasks = load_tasks_sample()
     all_outputs = {}
     for task in tasks:
-        task_output = await runtask(task, client, model_name, max_iterations, supports_tools, responses_api)
+        task_output = await runtask(task, client, model_name, max_iterations, supports_tools, responses_api, temperature)
         all_outputs[task.name] = task_output
     
     return all_outputs
