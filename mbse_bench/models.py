@@ -24,3 +24,13 @@ class Task:
     task_dir: str
     metadata: dict
     llm_judge_config: Optional[LlmJudgeConfig] = None
+
+
+@dataclass
+class ModelConfig:
+    """Configuration for a model to be evaluated."""
+    model_id: str
+    max_tokens: int = 1024
+    temperature: float = 0.0
+    supports_tools: bool = True
+    supports_responses: bool = False

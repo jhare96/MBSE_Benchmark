@@ -54,6 +54,7 @@ class CriterionScore(BaseModel):
 @dataclass
 class EvaluationResult:
     """Result of an evaluation."""
+    weight: float # relative weight of this evaluation in the overall score calculation
     score: float  # 0-1 normalized
     details: dict[str, CriterionScore] = field(default_factory=dict)
     explanation: str | None = None
@@ -81,12 +82,13 @@ class LLMEvaluationResult(BaseModel):
         """Create an error result."""
         return cls(criteria=[], explanation=message)
     
-    def to_evaluation_result(self) -> EvaluationResult:
+    def to_evaluation_result(self, weight: float) -> EvaluationResult:
         details = {c.name: c for c in self.criteria}
         return EvaluationResult(
             score=self.score,
             details=details,
-            explanation=self.explanation
+            explanation=self.explanation,
+            weight=weight
         )
 
 @dataclass
@@ -132,7 +134,7 @@ class LLMJudgmentEval(Eval):
     """
     name: str = "LLM Judgment"
     weight: float = 1.0
-    criteria: list[str] = field(default_factory=lambda: ["syntax_validity", "stdlib_usage", "completeness", "clarity"])
+    criteria: list[str] = field(default_factory=lambda: list(RUBRIC_TEMPLATES.keys()))
     rubric: dict[str, str] = field(default_factory=lambda: RUBRIC_TEMPLATES.copy())
     config: LlmJudgeConfig = None
     client: AsyncOpenAI = None
@@ -160,13 +162,13 @@ class LLMJudgmentEval(Eval):
 
                 parsed = result.choices[0].message.parsed
                 if parsed is not None:
-                    return parsed.to_evaluation_result()
+                    return parsed.to_evaluation_result(self.weight)
 
             except Exception as error:
-                return LLMEvaluationResult.error(f"LLM judge failed: {str(error)}").to_evaluation_result()
+                return LLMEvaluationResult.error(f"LLM judge failed: {str(error)}").to_evaluation_result(self.weight)
 
         if parsed is None:
-            return LLMEvaluationResult.error("LLM judge returned no parsed response").to_evaluation_result()
+            return LLMEvaluationResult.error("LLM judge returned no parsed response").to_evaluation_result(self.weight)
 
     def _build_prompt(
         self,
@@ -290,18 +292,10 @@ async def evaluate_task(task: Task, response: str, context: EvaluationContext, c
             print(f"Warning: Failed to run eval {eval_instance.name}: {e}")
             # Add error result
             results.append(EvaluationResult(
+                weight=eval_instance.weight,
                 score=0.0,
                 details={},
                 explanation=f"Eval {eval_instance.name} failed: {str(e)}"
             ))
-    
-    if not results:
-        # All evals failed, use default
-        default_eval = LLMJudgmentEval(
-            config=task.llm_judge_config,
-            client=client
-        )
-        result = await default_eval.evaluate(response, task, context)
-        return [result]
     
     return results

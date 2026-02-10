@@ -19,6 +19,7 @@ class FileCreatedEval(Eval):
         """Check if the required file exists."""
         if "requirements.txt" in context.files_changed:
             return EvaluationResult(
+                weight=self.weight,
                 score=1.0,
                 details={
                     "file_created": CriterionScore(
@@ -31,6 +32,7 @@ class FileCreatedEval(Eval):
             )
         else:
             return EvaluationResult(
+                weight=self.weight,
                 score=0.0,
                 details={
                     "file_created": CriterionScore(
@@ -55,6 +57,7 @@ class FormatCheckEval(Eval):
         
         if not req_file:
             return EvaluationResult(
+                weight=self.weight,
                 score=0.0,
                 details={
                     "format": CriterionScore(
@@ -70,6 +73,7 @@ class FormatCheckEval(Eval):
         
         if len(matches) > 0:
             return EvaluationResult(
+                weight=self.weight,
                 score=1.0,
                 details={
                     "format": CriterionScore(
@@ -82,6 +86,7 @@ class FormatCheckEval(Eval):
             )
         else:
             return EvaluationResult(
+                weight=self.weight,
                 score=0.0,
                 details={
                     "format": CriterionScore(

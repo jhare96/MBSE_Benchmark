@@ -11,7 +11,6 @@ def load_task(task_dir: str, llm_judge_config: LlmJudgeConfig | None = None) -> 
     task_file = pathlib.Path(task_dir) / "task.json"
     with open(task_file, "r") as f:
         task_json = json.load(f)
-        evaluate_config = EvaluationTask(**task_json['evaluation'])
 
         task_data = {
             'id': task_json['id'],
@@ -20,9 +19,8 @@ def load_task(task_dir: str, llm_judge_config: LlmJudgeConfig | None = None) -> 
             'description': task_json['description'],
             'prompt': task_json['prompt'],
             'task_dir': task_dir,
-            'evaluation': evaluate_config,
             'llm_judge_config': llm_judge_config,
-            'max_tokens': task_json.get('MaxTokens', None),
+            'max_tokens': task_json.get('maxTokens', None),
             'metadata': task_json.get('metadata', {}),
         }
         return Task(**task_data)

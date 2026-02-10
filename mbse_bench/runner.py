@@ -1,7 +1,7 @@
 import json
 import os
 from openai import AsyncOpenAI
-
+import re
 from mbse_bench.filesystem import FileSystem, load_virtual_filesystem
 from mbse_bench.tools import get_virtual_filesystem_tools, toolcall
 from mbse_bench.tasks import load_all_tasks, load_tasks_sample
@@ -56,57 +56,76 @@ def extract_and_apply_patch(final_response: str, fs: FileSystem) -> None:
         print(f"Patch Result: {result}")
 
 
-async def runtask(task: Task, client: AsyncOpenAI, model_name: str, max_iterations: int, tools: list[dict[str,str]], supports_tools: bool = True) -> EvaluationResult:
-    """agentic loop to run a task until completion"""
-    fs = load_virtual_filesystem(task.task_dir)
-
-    system_prompt = build_task_prompt(task, fs, supports_tools)
-    messages = [{"type": "message", "role": "system", "content": system_prompt}]
-    for iteration in range(max_iterations):
-        # use chat completions for simplicity and general compatibility 
-        response = await client.chat.completions.create(   
+async def get_response(client, model_name, input, tools, responses_api):
+    if responses_api:
+        return await client.responses.create(
             model=model_name,
-            messages=messages,
-            tools=tools if supports_tools else [],
+            input=input,
+            tools=tools,
+        )
+    else:
+        return await client.chat.completions.create(   
+            model=model_name,
+            messages=input,
+            tools=tools,
         )
 
-        assistant_message = response.choices[0].message
-        messages.append(assistant_message)
+
+def format_response(input: list) -> str:
+    formatted_output = ""
+    for item in input:
+        if isinstance(item, dict):
+            formatted_output += f"[{item.get('role', 'unknown')}]\n{item.get('content', '')}\n"
+        elif hasattr(item, 'role') and hasattr(item, 'content') and getattr(item, 'content') is not None:
+            formatted_output += f"[{getattr(item, 'role', 'unknown')}]\n{getattr(item, 'content', '')}\n"
+        # don't include tool calls as we only want to judge the final output.
+    return formatted_output
+
+async def runtask(task: Task, client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool) -> EvaluationResult:
+    """agentic loop to run a task until completion"""
+    fs = load_virtual_filesystem(task.task_dir)
+    tools = get_virtual_filesystem_tools(responses_api)
+    system_prompt = build_task_prompt(task, fs, supports_tools)
+    input = [{"type": "message", "role": "system", "content": system_prompt}]
+    for iteration in range(max_iterations):
+        response = await get_response(client, model_name, input, tools if supports_tools else [], responses_api)
+        if responses_api:
+            input += response.output
+            tool_calls = [item for item in response.output if item.type == "function_call"]
+        else: # chat completions
+            assistant_message = response.choices[0].message
+            input.append(assistant_message)
+            tool_calls = assistant_message.tool_calls
         
         # Check if there are tool calls
-        if not supports_tools or not assistant_message.tool_calls:
+        if not supports_tools or not tool_calls:
             break
 
         # Process each tool call
-        for tool_call in assistant_message.tool_calls:
-            result = toolcall(fs, tool_call.function.name, json.loads(tool_call.function.arguments))
+        for tool_call in tool_calls:
+            fn_name = tool_call.name if responses_api else tool_call.function.name
+            args = tool_call.arguments if responses_api else tool_call.function.arguments
+            result = toolcall(fs, fn_name, json.loads(args))
             
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": str(result),
-                }
-            )        
+            if responses_api:
+                input.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,  # Changed from tool_call.id
+                        "output": str(result),  # Changed from json.dumps dict to just the result string
+                    }
+                )
+            else:
+                input.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": str(result),
+                    }
+                ) 
         
-    final_response = ""
-    for message in messages:
-        # Handle both dict (user-created) and object (API response) formats
-        if isinstance(message, dict):
-            if message.get("type") == "message" and message.get("role") == "assistant":
-                final_response += message["content"] + "\n"
-        else:
-            if getattr(message, "type", None) == "message" and getattr(message, "role", None) == "assistant":
-                content = getattr(message, "content", None)
-                if content:
-                    # Content may be a list of content blocks
-                    if isinstance(content, list):
-                        for block in content:
-                            if hasattr(block, "text"):
-                                final_response += block.text + "\n"
-                    else:
-                        final_response += str(content) + "\n"
-
+    final_response = format_response(input)
+    
     if not supports_tools:
         extract_and_apply_patch(final_response, fs)
 
@@ -119,24 +138,22 @@ async def runtask(task: Task, client: AsyncOpenAI, model_name: str, max_iteratio
 
 
 
-async def run_tasks_in_parallel(tasks: list[Task], client: AsyncOpenAI, model_name: str, max_iterations: int) -> dict[str, EvaluationResult]:
+async def run_tasks_in_parallel(tasks: list[Task], client: AsyncOpenAI, model_name: str, max_iterations: int) -> dict[str, list[EvaluationResult]]:
     """runs multiple tasks in parallel and returns their outputs"""
-    tools = get_virtual_filesystem_tools()
     all_outputs = {}
     for task in tasks:
-        task_output = await runtask(task, client, model_name, max_iterations, tools, async_call=True)
+        task_output = await runtask(task, client, model_name, max_iterations, async_call=True)
         all_outputs[task.name] = task_output
     return all_outputs
 
 
 
-async def benchmark(client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool) -> dict[str, EvaluationResult]:
+async def benchmark(client: AsyncOpenAI, model_name: str, max_iterations: int, supports_tools: bool, responses_api: bool) -> dict[str, list[EvaluationResult]]:
     """runs the full benchmark on a set of tasks and returns their outputs"""
-    tools = get_virtual_filesystem_tools()
-    tasks = list(filter(lambda task: task.evaluation.type == "llm-judge", load_tasks_sample()))
+    tasks = load_tasks_sample()
     all_outputs = {}
     for task in tasks:
-        task_output = await runtask(task, client, model_name, max_iterations, tools, supports_tools)
+        task_output = await runtask(task, client, model_name, max_iterations, supports_tools, responses_api)
         all_outputs[task.name] = task_output
     
     return all_outputs
