@@ -25,11 +25,15 @@ def parse_unified_diff(patch: str) -> list[str]:
     while i < len(lines):
         line = lines[i]
         if not line:
+            i += 1
             continue
-
-        elif line.startswith('--- ') or line.startswith('+++ '):
+        elif line.startswith('--- '):
+            # Only start parsing on '---' line, not '+++'
             patch, i = parse_patch(lines, i)
             patches.append(patch)
+        else:
+            # Skip any other lines to avoid infinite loop
+            i += 1
         
     return patches
 
@@ -48,6 +52,9 @@ def parse_patch(lines: list[str], start_idx: int) -> tuple[FilePatch, int]:
             if line.startswith('@@ '):
                 hunk, i = parse_hunk(lines, i)
                 hunks.append(hunk)
+            elif line.startswith('--- '):
+                # Start of next patch, break out
+                break
             else:
                 i += 1
         
@@ -82,7 +89,8 @@ def parse_hunk(lines, start_idx: int) -> tuple[Hunk, int]:
         i = start_idx + 1
         while i < len(lines):
             line = lines[i]
-            if line.startswith('@@ '):
+            # Stop at next hunk or next patch
+            if line.startswith('@@ ') or line.startswith('--- '):
                 break
             hunk_lines.append(line)
             i += 1
@@ -132,15 +140,22 @@ class FileSystem:
 
                 content_lines = content.splitlines(keepends=True)
                 new_content_lines = copy.deepcopy(content_lines)
-                for hunk in patch.hunks:
-                    j = hunk.new_start
+                
+                sorted_hunks = sorted(patch.hunks, key=lambda h: h.old_start, reverse=True)
+                
+                for hunk in sorted_hunks:
+                    # Use old_start because we're applying to the original file positions
+                    j = hunk.old_start
                     for line in hunk.lines:
                         if line.startswith('+'):
                             new_content_lines.insert(j - 1, line[1:])
                             j += 1
                         elif line.startswith('-'):
+                            # Delete line at current position
+                            # Don't increment j - next line shifts into this position
                             del new_content_lines[j - 1]
                         else:
+                            # Context line (starts with space) - skip over it
                             j += 1
                 
                 files_to_update[patch.new_path] = ''.join(new_content_lines)
