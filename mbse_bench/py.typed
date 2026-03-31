@@ -1,0 +1,2 @@
+"""Type stubs marker for mypy."""
+# This file marks the package as PEP 561 compliant
