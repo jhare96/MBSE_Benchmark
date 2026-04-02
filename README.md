@@ -4,26 +4,27 @@ A benchmarking framework for evaluating AI models on Model-Based Systems Enginee
 
 ## Overview
 
-This tool provides a standardized way to benchmark AI models against a curated set of MBSE tasks, with caching, versioning, and beautiful CLI output.
+This tool provides a standardized way to benchmark AI models against a curated set of MBSE tasks, with versioning and a colorized CLI output.
 
 ## Features
 
-- 🚀 **Bun-powered** - Fast execution with Bun runtime
-- 🤖 **Multi-model support** - Test any AI model via AI SDK (Azure, OpenAI, local models)
+- 🐍 **Python-powered** - Simple setup with Python 3.10+
+- 🤖 **Multi-model support** - Test any AI model via OpenAI-compatible APIs (Azure, OpenAI, local models)
 - 📊 **Versioned benchmarks** - Track changes to tasks, tools, and datasets
-- 💾 **Result caching** - Skip already-run benchmarks unless forced
-- 🎨 **Beautiful CLI** - Ink-powered terminal interface
 - 📈 **GitHub Actions** - Automated benchmark runs with published rankings
 - 🔧 **SysML v2 Validators** - Built-in syntax validation and component extraction
 
 ## SysML v2 Tasks
 
-The benchmark currently includes SysML v2 tasks for:
+The benchmark includes 59 SysML v2 tasks across 7 categories:
 
-- **Validation** (e.g., `sysml-valid-detection-001`): Syntax validation, error detection
-- **Extraction** (e.g., `sysml-extract-parts-001`): Part, port, requirement, connection extraction
-
-Additional categories such as analysis, generation, and transformation are planned for future releases.
+- **Validation** (6 tasks, e.g., `sysml-valid-detection-001`): Syntax validation, error detection
+- **Extraction** (8 tasks, e.g., `sysml-extract-parts-001`): Part, port, requirement, connection, attribute, action, hierarchy, and interface extraction
+- **Analysis** (11 tasks, e.g., `sysml-analyze-flow-001`): Specialization, flow, constraints, dependencies, variations, topology, individuals, cross-references, and state machine analysis
+- **Requirements Traceability** (5 tasks, e.g., `sysml-req-satisfaction-001`): Satisfaction, coverage, constraint, derivation, and impact analysis
+- **Generation** (14 tasks, e.g., `sysml-generate-part-001`): Generating valid SysML v2 from natural language requirements
+- **Transformation** (12 tasks, e.g., `sysml-transform-refactor-001`): Converting SysML v2 to/from other representations (PlantUML, TypeScript, documentation, etc.)
+- **Advanced Semantic Analysis** (3 tasks, e.g., `sysml-advanced-quality-001`): Expert-level model quality, pattern, and merge analysis
 
 ### Source Models
 
@@ -33,117 +34,119 @@ The SysML v2 models in `data/tasks/models/source/` are from the
 
 ## Installation
 
-### From Release (Recommended)
-
-Download the pre-built binary for your platform from the [Releases](https://github.com/Nepomuceno/mbse_benchmark/releases) page:
-
-- `mbse-bench-linux-x64` - Linux (x64)
-- `mbse-bench-linux-arm64` - Linux (ARM64)
-- `mbse-bench-darwin-x64` - macOS (Intel)
-- `mbse-bench-darwin-arm64` - macOS (Apple Silicon)
-- `mbse-bench-windows-x64.exe` - Windows (x64)
-
 ### From Source
 
 ```bash
-bun install
+# Clone the repository
+git clone https://github.com/jhare96/MBSE_Benchmark.git
+cd MBSE_Benchmark
+
+# Install dependencies
+pip install -e .
 ```
 
-### Build Standalone Binary
+### Requirements
 
-```bash
-bun run build
-./dist/mbse-bench --help
-```
+- Python 3.10 or higher
+- An OpenAI-compatible API key (Azure AI Foundry, OpenAI, or local model server)
 
 ## Usage
 
 ```bash
+# Run all tasks with the default model (gpt-4.1)
+python -m mbse_bench
+
 # Run benchmark for a specific model
-bun run bench --model gpt-4
+python -m mbse_bench --model gpt-4.1
 
-# Run all configured models
-bun run bench --all
+# Run specific tasks
+python -m mbse_bench --tasks sysml-valid-detection-001,sysml-extract-parts-001
 
-# Force re-run (ignore cache)
-bun run bench --model gpt-4 --force
+# Run all configured models from config/models.json
+python -m mbse_bench --model all
 
-# List available models
-bun run bench --list
+# Use Azure OpenAI (with DefaultAzureCredential)
+python -m mbse_bench --model gpt-4.1 --azure
+
+# Disable tool calling
+python -m mbse_bench --model gpt-4.1 --no-tools
 ```
 
 ## Configuration
 
 ### Models (`config/models.json`)
 
-Define your AI models with their specifications and credentials:
+Define your AI models with their specifications:
 
 ```json
 {
   "models": [
     {
-      "id": "gpt-4",
-      "name": "GPT-4",
+      "id": "gpt-4.1",
+      "name": "GPT-4.1",
       "provider": "azure",
-      "envKey": "AZURE_OPENAI_API_KEY"
+      "envKey": "AZURE_OPENAI_API_KEY",
+      "envEndpoint": "AZURE_OPENAI_ENDPOINT",
+      "deployment": "gpt-4.1",
+      "supportsResponses": true,
+      "supportsTools": true
+    },
+    {
+      "id": "local-model",
+      "name": "Local Model",
+      "provider": "openai-compatible",
+      "envEndpoint": "LOCAL_MODEL_URL",
+      "model": "your-model-name",
+      "supportsTools": true
     }
   ]
 }
 ```
 
+See [docs/model-configuration.md](./docs/model-configuration.md) for the full list of supported properties and models.
+
 ### Environment Variables
 
-Set credentials for your AI providers:
+Copy `.env.example` to `.env` and set credentials for your AI providers:
 
 ```bash
-# Azure AI Foundry
-AZURE_OPENAI_API_KEY=your-key
-AZURE_OPENAI_ENDPOINT=https://your-endpoint.openai.azure.com
+# Azure AI Foundry / Azure OpenAI
+AZURE_OPENAI_API_KEY=your-azure-openai-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com
 
 # OpenAI
-OPENAI_API_KEY=your-key
+OPENAI_API_KEY=your-openai-api-key
 
-# Local models (Ollama, etc.)
-LOCAL_MODEL_URL=http://localhost:11434
+# Local models (LM Studio, Ollama, vLLM, etc.)
+LOCAL_API_KEY=
+LOCAL_MODEL_URL=http://localhost:1234/v1
 ```
 
 ## Project Structure
 
 ```text
-├── src/
-│   ├── cli/              # Ink CLI components
-│   ├── benchmark/        # Benchmark runner logic
-│   ├── evaluation/       # Evaluation strategies
-│   │   ├── validators/   # SysML v2 validators
-│   │   └── strategies/   # Scoring strategies
-│   ├── models/           # AI model adapters
-│   ├── cache/            # Result caching
-│   └── utils/            # Shared utilities
+├── mbse_bench/           # Python package (benchmark runner)
+│   ├── __main__.py       # CLI entry point
+│   ├── runner.py         # Task runner / agent loop
+│   ├── evaluation.py     # Evaluation strategies
+│   ├── tasks.py          # Task loading
+│   ├── models.py         # Model configuration
+│   ├── filesystem.py     # Virtual filesystem utilities
+│   ├── tools.py          # Agent tools
+│   └── results.py        # Result saving
 ├── data/
-│   ├── tasks/            # Benchmark tasks
+│   ├── tasks/            # Benchmark task definitions
 │   │   ├── models/       # Source SysML models (from GfSE)
 │   │   │   ├── source/   # Valid models
 │   │   │   └── invalid/  # Intentionally invalid models
+│   │   ├── index.json    # Task registry with categories
 │   │   └── sysml-*/      # Individual task definitions
-│   └── results/          # Cached results
+│   └── results/          # Stored benchmark results
 ├── config/
-│   └── models.json       # Model configurations
-└── .plan/                # Implementation plans for LLM agents
+│   ├── models.json       # Model configurations
+│   └── benchmark.json    # Benchmark runner settings
+└── docs/                 # Extended documentation
 ```
-
-## Implementation Plans (.plan)
-
-The `.plan/` folder contains implementation plans and progress tracking for
-AI agents working on this project. It includes:
-
-- Task specifications for all SysML v2 benchmark categories
-- Implementation checklists with progress tracking
-- Prompts for continuing development in new sessions
-- Best practices and guidelines for task implementation
-
-**Note:** This folder is committed to the repository to enable collaborative
-AI-assisted development. It will be cleaned up or archived after the
-implementation phase is complete.
 
 ## Benchmark Versioning
 
@@ -158,20 +161,20 @@ Any change to these creates a new version, ensuring result comparability.
 
 ## Results
 
-Results are stored in `data/results/` with the structure:
+Results are stored in `data/results/` organized by benchmark version and timestamp:
 
 ```text
 data/results/
-├── v1.0.0/
-│   ├── gpt-4.json
-│   └── claude-3.json
-└── v1.1.0/
-    └── gpt-4.json
+├── 0.1.0-202512221459/
+│   ├── gpt-4.1.json
+│   └── deepseek-v3.2.json
+└── 0.1.0-202512240921/
+    └── gpt-5.2.json
 ```
 
 ## License
 
-MIT License - Gabriel Nepomuceno
+MIT License
 
 ## Contributing
 
